@@ -26,5 +26,18 @@ class ToDoViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return itemsToDo.count
     }
+    
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let myCell: UITableViewCell? = tableView.cellForRow(at: indexPath)
+        myCell?.textLabel?.text = String(Int.random(in: 0...5))
+        if myCell?.accessoryType == .checkmark{
+            myCell?.accessoryType = .none
+        }
+        else{
+            myCell?.accessoryType = .checkmark
+        }
+        tableView.deselectRow(at: indexPath, animated: true)
+    }
+
 }
 
