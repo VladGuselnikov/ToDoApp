@@ -10,7 +10,7 @@ import UIKit
 
 class ToDoViewController: UITableViewController {
     
-    let itemsToDo = ["rereg","ergregrr","fffffff"]
+    var toDoArray = ["rereg","ergregrr","fffffff"]
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -19,12 +19,12 @@ class ToDoViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoCell", for: indexPath)
-        cell.textLabel?.text = itemsToDo[indexPath.row]
+        cell.textLabel?.text = toDoArray[indexPath.row]
         return cell
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return itemsToDo.count
+        return toDoArray.count
     }
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -39,5 +39,21 @@ class ToDoViewController: UITableViewController {
         tableView.deselectRow(at: indexPath, animated: true)
     }
 
+    @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
+        let alert = UIAlertController(title: "New task", message: "", preferredStyle: .alert)
+        alert.addTextField { (textField) in
+            textField.placeholder = "Name"
+        }
+        let alertAction = UIAlertAction(title: "Add", style: .default, handler: {
+            (result) in
+            if let textFieldValue = alert.textFields![0].text{
+                self.toDoArray.append(textFieldValue)
+                self.tableView.reloadData()
+            }
+        })
+        
+        alert.addAction(alertAction)
+        present(alert,animated: true)
+    }
 }
 
