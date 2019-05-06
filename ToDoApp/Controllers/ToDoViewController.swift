@@ -7,24 +7,39 @@
 //
 
 import UIKit
+import CoreData
 
 class ToDoViewController: UITableViewController {
     
-    var toDoArray:[Task] = [Task(title: "Test task")]
+    
+    
+    @IBOutlet var taskSearchBar: UISearchBar!
+    
+    var toDoArray:[Task] = []
+    var currentCategory: Category?{
+        didSet{
+            loadTasks()
+        }
+    }
     
     let defaultsArrayKey = "ToDoArray"
     
-    var defaultsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+    
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        defaultsPath = defaultsPath?.appendingPathComponent("\(defaultsArrayKey).plist")
-        print(defaultsPath!)
-        //Taking of data from local memory
-        loadTasks()
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!)
+        
+        
+//        loadTasks()
+        
         // Do any additional setup after loading the view.
     }
 
+    
+    
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return toDoArray.count
     }
@@ -41,11 +56,17 @@ class ToDoViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         toDoArray[indexPath.row].done = !toDoArray[indexPath.row].done
+//        context.delete(toDoArray[indexPath.row])
+//        toDoArray.remove(at: indexPath.row)
         tableView.reloadData()
         tableView.deselectRow(at: indexPath, animated: true)
         saveTasks()
     }
-
+    
+    
+    
+    
+    
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         let alert = UIAlertController(title: "New task", message: "", preferredStyle: .alert)
         alert.addTextField { (textField) in
@@ -55,7 +76,10 @@ class ToDoViewController: UITableViewController {
             (result) in
             if let textFieldValue = alert.textFields?.first?.text{
                 if textFieldValue != ""{
-                    self.toDoArray.append(Task(title: textFieldValue))
+                    let task = Task(context: self.context)
+                    task.title = textFieldValue
+                    task.parentCategory = self.currentCategory
+                    self.toDoArray.append(task)
                     self.tableView.reloadData()
                     self.saveTasks()
                 }
@@ -68,27 +92,63 @@ class ToDoViewController: UITableViewController {
     }
     
     func saveTasks() {
-        let plEncoder = PropertyListEncoder()
         do {
-            
-            let data = try plEncoder.encode(toDoArray)
-            try data.write(to: defaultsPath!)
+            try context.save()
         } catch {
-            print("Encoding error",error)
+            print("Context save error",error)
         }
     }
     
-    func loadTasks() {
-        let plDecoder = PropertyListDecoder()
-        if let data = try? Data(contentsOf: defaultsPath!) {
-            do{
-                toDoArray = try plDecoder.decode([Task].self, from: data)
+    func loadTasks(with request : NSFetchRequest<Task> = Task.fetchRequest()) {
+        let categoryPredicate = NSPredicate(format: "parentCategory = %@", currentCategory!)
+        if request.predicate != nil {
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [request.predicate!,categoryPredicate])
+        }
+        else{
+            request.predicate = categoryPredicate
+        }
+        
+        do {
+            toDoArray = try context.fetch(request)
+        } catch {
+            print("Context read error")
+        }
 
-            }catch{
-                print("Decoding error",error)
+        tableView.reloadData()
+    }
+    
+}
+
+extension ToDoViewController: UISearchBarDelegate{
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+            let searchRequest: NSFetchRequest<Task> = Task.fetchRequest()
+            searchRequest.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+            searchRequest.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+            loadTasks(with: searchRequest)
+        
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchText.count == 0 {
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
             }
-            
+            loadTasks()
         }
     }
 }
+
+//extension ToDoViewController : ChooseCategory{
+//    func userChoosed(category: Category) {
+//        currentCategory = category
+//        print(category.name!)
+//        loadTasks()
+//    }
+//
+//
+//}
+//
+//protocol ChooseCategory {
+//    func userChoosed(category: Category)
+//}
 
