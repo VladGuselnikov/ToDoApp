@@ -7,7 +7,7 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class ToDoViewController: UITableViewController {
     
@@ -15,52 +15,46 @@ class ToDoViewController: UITableViewController {
     
     @IBOutlet var taskSearchBar: UISearchBar!
     
-    var toDoArray:[Task] = []
+    var tasks: Results<Task>?
+    var categoryPredicate: NSPredicate?
+    
     var currentCategory: Category?{
         didSet{
             loadTasks()
         }
     }
     
+    let realm = try! Realm()
+    
     let defaultsArrayKey = "ToDoArray"
     
-    
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-
-    
+  
     override func viewDidLoad() {
         super.viewDidLoad()
         print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!)
-        
-        
-//        loadTasks()
-        
-        // Do any additional setup after loading the view.
+               // Do any additional setup after loading the view.
     }
 
     
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return toDoArray.count
+        return tasks?.count ?? 0
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoCell", for: indexPath)
-        let task = toDoArray[indexPath.row]
-        cell.textLabel?.text = task.title
-        cell.accessoryType = task.done ? .checkmark : .none
+        let task = tasks?[indexPath.row]
+        cell.textLabel?.text = task!.title
+        cell.accessoryType = task!.done ? .checkmark : .none
         return cell
     }
     
     
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        toDoArray[indexPath.row].done = !toDoArray[indexPath.row].done
-//        context.delete(toDoArray[indexPath.row])
-//        toDoArray.remove(at: indexPath.row)
+        update(task: (tasks?[indexPath.row])!)
         tableView.reloadData()
         tableView.deselectRow(at: indexPath, animated: true)
-        saveTasks()
     }
     
     
@@ -76,12 +70,10 @@ class ToDoViewController: UITableViewController {
             (result) in
             if let textFieldValue = alert.textFields?.first?.text{
                 if textFieldValue != ""{
-                    let task = Task(context: self.context)
-                    task.title = textFieldValue
-                    task.parentCategory = self.currentCategory
-                    self.toDoArray.append(task)
-                    self.tableView.reloadData()
-                    self.saveTasks()
+                    let newTask = Task()
+                    newTask.title = textFieldValue
+                    newTask.createdAt = Date()
+                    self.save(task: newTask)
                 }
                 
             }
@@ -91,49 +83,51 @@ class ToDoViewController: UITableViewController {
         present(alert,animated: true)
     }
     
-    func saveTasks() {
+    func save(task: Task) {
         do {
-            try context.save()
+            try realm.write {
+                currentCategory?.tasks.append(task)
+            }
         } catch {
-            print("Context save error",error)
+            print(error)
         }
-    }
-    
-    func loadTasks(with request : NSFetchRequest<Task> = Task.fetchRequest()) {
-        let categoryPredicate = NSPredicate(format: "parentCategory = %@", currentCategory!)
-        if request.predicate != nil {
-            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [request.predicate!,categoryPredicate])
-        }
-        else{
-            request.predicate = categoryPredicate
-        }
-        
-        do {
-            toDoArray = try context.fetch(request)
-        } catch {
-            print("Context read error")
-        }
+        self.tableView.reloadData()
 
-        tableView.reloadData()
     }
     
+    func update(task: Task) {
+        do {
+            try realm.write {
+                task.done = !task.done
+            }
+        } catch {
+            print(error)
+        }
+        self.tableView.reloadData()
+        
+    }
+    
+   
+    
+    func loadTasks() {
+        tasks = currentCategory?.tasks.sorted(byKeyPath: "createdAt", ascending: true)
+    }
 }
 
 extension ToDoViewController: UISearchBarDelegate{
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-            let searchRequest: NSFetchRequest<Task> = Task.fetchRequest()
-            searchRequest.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
-            searchRequest.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-            loadTasks(with: searchRequest)
-        
+        tasks = currentCategory?.tasks.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "title", ascending: true)
+        tableView.reloadData()
     }
-    
+
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         if searchText.count == 0 {
             DispatchQueue.main.async {
                 searchBar.resignFirstResponder()
             }
             loadTasks()
+            tableView.reloadData()
+
         }
     }
 }
@@ -151,4 +145,5 @@ extension ToDoViewController: UISearchBarDelegate{
 //protocol ChooseCategory {
 //    func userChoosed(category: Category)
 //}
+
 
