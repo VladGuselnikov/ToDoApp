@@ -8,12 +8,14 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
-class ToDoViewController: UITableViewController {
+class ToDoViewController: SwipeTableViewController {
     
     
     
     @IBOutlet var taskSearchBar: UISearchBar!
+    @IBOutlet var searchBar: UISearchBar!
     
     var tasks: Results<Task>?
     var categoryPredicate: NSPredicate?
@@ -21,6 +23,7 @@ class ToDoViewController: UITableViewController {
     var currentCategory: Category?{
         didSet{
             loadTasks()
+
         }
     }
     
@@ -28,24 +31,59 @@ class ToDoViewController: UITableViewController {
     
     let defaultsArrayKey = "ToDoArray"
     
-  
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!)
+        tableView.separatorStyle = .none
+        
                // Do any additional setup after loading the view.
     }
-
     
+  
+    override func viewWillAppear(_ animated: Bool) {
+        title = currentCategory?.name
+        guard let categoryColor = currentCategory?.color else {fatalError()}
+        updateSearchBar(with: categoryColor)
+        updateNavBar(with: categoryColor)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        updateNavBar(with: "128797")
+    }
+    
+    func updateNavBar(with hexCode: String) {
+        guard let navBar = navigationController?.navigationBar else {fatalError("no navigationController")}
+        if let navBarColor = UIColor(hexString: hexCode) {
+            navBar.barTintColor = navBarColor
+             navBar.tintColor = ContrastColorOf(navBarColor, returnFlat: true)
+            navBar.largeTitleTextAttributes = [NSAttributedString.Key.foregroundColor : ContrastColorOf(navBarColor, returnFlat: true)]
+        }
+    }
+    
+    func updateSearchBar(with hexCode: String) {
+        if let searchBarColor = UIColor(hexString: hexCode) {
+            searchBar.barTintColor = searchBarColor
+//            searchBar.layer.borderWidth = 1
+//            searchBar.layer.borderColor = searchBarColor.cgColor
+        }
+    }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return tasks?.count ?? 0
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         let task = tasks?[indexPath.row]
         cell.textLabel?.text = task!.title
         cell.accessoryType = task!.done ? .checkmark : .none
+        let flatColor = UIColor(hexString: currentCategory!.color)
+        if let cellColor = flatColor!.darken(byPercentage: CGFloat(indexPath.row)/CGFloat(tasks!.count)) {
+            cell.backgroundColor = cellColor
+            cell.textLabel?.textColor = ContrastColorOf(cellColor, returnFlat: true)
+        }
+        
         return cell
     }
     
@@ -57,6 +95,18 @@ class ToDoViewController: UITableViewController {
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
+    override func deleteRow(with indexPath: IndexPath) {
+        if let swipeTask = tasks?[indexPath.row] {
+            do {
+                try realm.write {
+                    realm.delete(swipeTask)
+                }
+            } catch {
+                print(error)
+            }
+        }
+        
+    }
     
     
     
@@ -107,7 +157,7 @@ class ToDoViewController: UITableViewController {
         
     }
     
-   
+    
     
     func loadTasks() {
         tasks = currentCategory?.tasks.sorted(byKeyPath: "createdAt", ascending: true)

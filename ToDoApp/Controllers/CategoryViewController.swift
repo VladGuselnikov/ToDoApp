@@ -8,8 +8,9 @@
 
 import UIKit
 import RealmSwift
+import ChameleonFramework
 
-class CategoryViewController: UITableViewController {
+class CategoryViewController: SwipeTableViewController {
     
 
     var categories : Results<Category>?
@@ -19,6 +20,8 @@ class CategoryViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
             loadCategories()
+        tableView.rowHeight = 80
+        tableView.separatorStyle = .none
         }
 
     // MARK: - Table view data source
@@ -34,8 +37,12 @@ class CategoryViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         cell.textLabel?.text = categories?[indexPath.row].name
+        if let categoryColor = categories?[indexPath.row].color {
+            cell.backgroundColor = UIColor(hexString: categoryColor)
+        }
+        cell.textLabel?.textColor = ContrastColorOf(cell.backgroundColor!, returnFlat: true)
         return cell
     }
     
@@ -61,6 +68,7 @@ class CategoryViewController: UITableViewController {
                 if categoryName != ""{
                     let newCategory = Category()
                     newCategory.name = categoryName
+                    newCategory.color = UIColor.randomFlat.hexValue()
                     self.save(category: newCategory)
                 }
             }
@@ -88,6 +96,20 @@ class CategoryViewController: UITableViewController {
         tableView.reloadData()
 
     }
+    
+    override func deleteRow(with indexPath: IndexPath) {
+        if let swipeCategory = categories?[indexPath.row]{
+            do {
+                try realm.write {
+                    realm.delete(swipeCategory.tasks)
+                    realm.delete(swipeCategory)
+                }
+            } catch {
+                print(error)
+            }
+        }
+    }
+    
 }
 
 
